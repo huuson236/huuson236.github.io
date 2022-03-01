@@ -1,16 +1,123 @@
-<!DOCTYPE html>
-<html lang="en" class="dark">
-  <head>
-    <meta charset="UTF-8" />
-    <link rel="icon" href="/favicon.ico" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Vite App</title>
-  <script type="module" crossorigin src="/assets/index.cf01e4ac.js"></script>
-  <link rel="modulepreload" href="/assets/vendor.f85587d2.js">
-  <link rel="stylesheet" href="/assets/index.6c64410c.css">
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet" crossorigin="anonymous">
+    <!-- <link href="/haarcascade_frontalface_default.xml" rel="import" type="xml"/> -->
+    <title>VPS demo</title>
 </head>
-  <body class="dark:bg-gray-900 bg-gray-200">
-    <div id="app"></div>
+<body>
+    <div class="container-fluid">
+        <div class="row mt-4">
+            <div class="col-6 offset-3">
+                <button class="btn btn-danger my-3" id="start-or-stop">Start</button>
+                <br>
+                <video id="input-video" width="640" height="480" hidden></video>
+                <canvas id="canvasOutput" width="640" height="480"></canvas>
+                <p>FPS: <span id="fps">0</span></p>
+            </div>
+        </div>
+    </div>
     
-  </body>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js" crossorigin="anonymous"></script>
+    <script async type="text/javascript" src="./opencv.3.4.js" onload="onOpenCvReady();"></script>
+    <script type="text/javascript">
+        const createFileFromUrl = function(path, url, callback) {
+            console.log("hello")
+            let request = new XMLHttpRequest();
+            request.open('GET', url, true);
+            request.responseType = 'arraybuffer';
+            request.onload = function(ev) {
+                if (request.readyState === 4) {
+                    if (request.status === 200) {
+                        let data = new Uint8Array(request.response);
+                        cv.FS_createDataFile('/', path, data, true, false, false);
+                        callback();
+                    } else {
+                        console.log('Failed to load ' + url + ' status: ' + request.status);
+                    }
+                }
+            };
+            request.send();
+        };
+        
+        function onOpenCvReady() {
+            console.log("OpenCV.js is ready!", cv)
+            createFileFromUrl("face.xml", "/haarcascade_frontalface_default.xml", ()=>{console.log("OK")})
+            
+            let video = document.getElementById('input-video');
+
+            
+            let src = new cv.Mat(video.height, video.width, cv.CV_8UC4);
+            let dst = new cv.Mat(video.height, video.width, cv.CV_8UC4);
+            let gray = new cv.Mat();
+            let cap = new cv.VideoCapture(video);
+            let faces = new cv.RectVector();
+            let classifier = new cv.CascadeClassifier();
+            let streaming = false;
+            const fps = document.getElementById("fps")
+
+            const maxFPS = 30;
+            const minDelay = 1000 / maxFPS;
+
+            function processVideo() {
+                try {
+                    if (!streaming) {
+                        return;
+                    }
+                    let begin = Date.now();
+                    // start processing.
+                    cap.read(dst);
+                    // src.copyTo(dst);
+                    cv.cvtColor(dst, gray, cv.COLOR_RGBA2GRAY, 0);
+                    // detect faces.
+                    classifier.detectMultiScale(gray, faces, 1.2, 5, 0, new cv.Size(130));
+                    // draw faces.
+                    for (let i = 0; i < faces.size(); ++i) {
+                        let face = faces.get(i);
+                        console.log(face.width, face.height)
+                        let point1 = new cv.Point(face.x, face.y);
+                        let point2 = new cv.Point(face.x + face.width, face.y + face.height);
+                        cv.rectangle(dst, point1, point2, [0, 255, 0, 255], 2);
+                    }
+                    cv.imshow('canvasOutput', dst);
+                    // schedule the next one.
+                    let dur = Date.now() - begin
+                    let delay = minDelay - dur
+                    // console.log(dur, 1000/dur)
+                    fps.innerText = (1000 / Math.max(minDelay, dur)).toFixed(2).toString()
+                    setTimeout(processVideo, delay);
+                } catch (err) {
+                    console.log(err)
+                    // utils.printError(err);
+                }
+            };
+            const btn = document.getElementById("start-or-stop")
+            btn.onclick = run
+
+            function run() {
+                streaming = !streaming
+                if (streaming) {
+                    navigator.mediaDevices.getUserMedia({ video: true, audio: false })
+                    .then(function(stream) {
+                        video.srcObject = stream;
+                        video.play();
+                    })
+                    .catch(function(err) {
+                        console.log("An error occurred! " + err);
+                    });
+                    classifier.load("/face.xml")
+                    processVideo()
+                    btn.innerText = "Stop"
+                } else {
+                    btn.innerText = "Start"
+                }
+            }
+            // schedule the first one.
+            // setTimeout(processVideo, 0);
+
+        }
+    </script>
+</body>
 </html>
