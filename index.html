@@ -98,7 +98,7 @@
                 function run() {
                     streaming = !streaming
                     if (streaming) {
-                        navigator.mediaDevices.getUserMedia({ video: true, audio: false })
+                        navigator.mediaDevices.getUserMedia({ video: {width: 480, height: 480, facingMode: "user"}, audio: false })
                         .then(function(stream) {
                             video.srcObject = stream;
                             video.play();
