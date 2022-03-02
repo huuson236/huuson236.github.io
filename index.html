@@ -45,6 +45,7 @@
             cv['onRuntimeInitialized']=()=>{
                 console.log("OpenCV.js is ready!", cv)
                 createFileFromUrl("face.xml", "/haarcascade_frontalface_default.xml", ()=>{console.log("OK")})
+                createFileFromUrl("eye.xml", "/haarcascade_eye.xml", ()=>{console.log("OK")})
                 
                 let video = document.getElementById('input-video');
 
@@ -54,9 +55,11 @@
                 let gray = new cv.Mat();
                 let cap = new cv.VideoCapture(video);
                 let faces = new cv.RectVector();
+                let eyes = new cv.RectVector();
                 let classifier = new cv.CascadeClassifier();
+                let eyeClassifier = new cv.CascadeClassifier();
                 let streaming = false;
-                const fps = document.getElementById("fps")
+                const fps = document.getElementById("fps");
 
                 const maxFPS = 30;
                 const minDelay = 1000 / maxFPS;
@@ -74,11 +77,29 @@
                         // detect faces.
                         classifier.detectMultiScale(gray, faces, 1.2, 5, 0, new cv.Size(130));
                         // draw faces.
+                        let maxAreaFaceId = -1
+                        let maxArea = 0
                         for (let i = 0; i < faces.size(); ++i) {
                             let face = faces.get(i);
+                            let area = face.width * face.height
+                            if (area > maxArea) {
+                                maxArea = area
+                                maxAreaFaceId = i
+                            }
+                        }
+                        if (maxAreaFaceId != -1) {
+                            let face = faces.get(maxAreaFaceId);
                             let point1 = new cv.Point(face.x, face.y);
                             let point2 = new cv.Point(face.x + face.width, face.y + face.height);
                             cv.rectangle(dst, point1, point2, [0, 255, 0, 255], 2);
+                            eyeClassifier.detectMultiScale(gray.roi(face), eyes, 1.2, 7, 0, new cv.Size(30));
+
+                            for (let j = 0; j < eyes.size(); ++j) {
+                                let point1 = new cv.Point(eyes.get(j).x, eyes.get(j).y);
+                                let point2 = new cv.Point(eyes.get(j).x + eyes.get(j).width,
+                                                        eyes.get(j).y + eyes.get(j).height);
+                                cv.rectangle(dst.roi(face), point1, point2, [255, 255, 0, 255], 2);
+                            }
                         }
                         cv.imshow('canvasOutput', dst);
                         // schedule the next one.
@@ -107,6 +128,7 @@
                             console.log("An error occurred! " + err);
                         });
                         classifier.load("/face.xml")
+                        eyeClassifier.load("/eye.xml")
                         processVideo()
                         btn.innerText = "Stop"
                     } else {
