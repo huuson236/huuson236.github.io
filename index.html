@@ -92,13 +92,20 @@
                             let point1 = new cv.Point(face.x, face.y);
                             let point2 = new cv.Point(face.x + face.width, face.y + face.height);
                             cv.rectangle(dst, point1, point2, [0, 255, 0, 255], 2);
-                            eyeClassifier.detectMultiScale(gray.roi(face), eyes, 1.2, 7, 0, new cv.Size(30));
+                            let halfFace = {
+                                x: face.x,
+                                y: face.y,
+                                width: face.width,
+                                height: Math.round(face.height/2)
+                            }
+                            let maxEyeWidth = Math.round(face.width/3)
+                            eyeClassifier.detectMultiScale(gray.roi(halfFace), eyes, 1.2, 5, 0, new cv.Size(30), new cv.Size(maxEyeWidth));
 
                             for (let j = 0; j < eyes.size(); ++j) {
                                 let point1 = new cv.Point(eyes.get(j).x, eyes.get(j).y);
                                 let point2 = new cv.Point(eyes.get(j).x + eyes.get(j).width,
                                                         eyes.get(j).y + eyes.get(j).height);
-                                cv.rectangle(dst.roi(face), point1, point2, [255, 255, 0, 255], 2);
+                                cv.rectangle(dst.roi(halfFace), point1, point2, [255, 255, 0, 255], 2);
                             }
                         }
                         cv.imshow('canvasOutput', dst);
